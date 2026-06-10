@@ -1,0 +1,44 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# Environment
+.env
+.env.local
+.env.production
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Database
+*.db
+*.sqlite3
+data/
+
+# Logs
+*.log
+*.err
+
+# Frontend
+node_modules/
+dist/
+build/
+
+# Generated reports
+*.xlsx
+*.docx
+*.pdf
+
+# Docker
+.docker/

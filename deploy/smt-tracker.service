@@ -1,0 +1,25 @@
+[Unit]
+Description=SMT Downtime Tracker Backend
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=simple
+User=smt-tracker
+WorkingDirectory=/opt/smt-downtime-tracker/backend
+Environment=PATH=/opt/smt-downtime-tracker/backend/venv/bin
+ExecStart=/opt/smt-downtime-tracker/backend/venv/bin/python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
+Restart=always
+RestartSec=10
+StandardOutput=append:/var/log/smt-tracker/backend.out.log
+StandardError=append:/var/log/smt-tracker/backend.err.log
+
+# Security hardening
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/opt/smt-downtime-tracker/backend/data /var/log/smt-tracker
+
+[Install]
+WantedBy=multi-user.target
