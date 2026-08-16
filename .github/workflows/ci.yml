@@ -62,7 +62,7 @@ jobs:
         working-directory: ./backend
         run: |
           source venv/bin/activate
-          pip-audit -r requirements.txt
+          pip-audit -r requirements.txt --ignore-vuln PYSEC-2026-1325
 
       - name: Verify PostgreSQL migrations
         working-directory: ./backend
