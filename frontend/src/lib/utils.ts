@@ -1,5 +1,6 @@
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import type { BadgeVariant } from '../components/ui/Badge';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -45,8 +46,8 @@ export function getCategoryLabel(category: string): string {
   return labels[category] || category;
 }
 
-export function getCategoryColor(category: string): string {
-  const colors: Record<string, string> = {
+export function getCategoryColor(category: string): BadgeVariant {
+  const colors: Record<string, BadgeVariant> = {
     machine_fault: 'danger',
     material_shortage: 'warning',
     program_setup: 'primary',

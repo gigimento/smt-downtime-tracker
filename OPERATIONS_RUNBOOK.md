@@ -89,6 +89,8 @@ Minimum rules:
 - team PINs should be changed if a shared PIN is exposed
 - personal PINs should be changed when an operator changes role
 
+If an admin removes a user or machine that already has downtime history, the app deactivates it instead of deleting it. This keeps reports and old downtime records intact while hiding the item from normal operational use.
+
 ## Environment File
 
 Production config lives in:

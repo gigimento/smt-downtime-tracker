@@ -1,7 +1,8 @@
 import { useState, FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AlertCircle, Activity, ScanLine } from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../context/useAuth';
+import { getApiErrorMessage } from '../services/api';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Card, CardBody } from '../components/ui/Card';
@@ -21,8 +22,8 @@ export function LoginPage() {
     try {
       await login(badgeCode, pinCode || undefined);
       navigate('/scan', { replace: true });
-    } catch (err: any) {
-      setError(err.response?.data?.detail || 'Pogrešan barkod ili PIN');
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, 'Pogrešan barkod ili PIN'));
     } finally {
       setIsLoading(false);
     }

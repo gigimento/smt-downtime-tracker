@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import type { ComponentType } from 'react';
 import {
   BarChart as BarChartIcon,
   PieChart,
@@ -10,13 +11,13 @@ import {
   Check,
   AlertCircle,
 } from 'lucide-react';
-import { downtimeApi, kpiApi, exportApi } from '../services/api';
+import { downtimeApi, kpiApi, exportApi, getApiErrorMessage } from '../services/api';
 import { Card, CardBody, CardHeader } from '../components/ui/Card';
 import { Select } from '../components/ui/Input';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
 import { getCategoryLabel, getCategoryColor } from '../lib/utils';
-import type { KPIMonthlyResponse } from '../types';
+import type { DowntimeCategory, KPIMonthlyResponse } from '../types';
 import {
   BarChart,
   Bar,
@@ -34,6 +35,34 @@ const COLORS = [
   '#ef4444', '#f59e0b', '#3b82f6', '#22c55e', '#f97316', '#8b5cf6', '#ec4899', '#06b6d4',
 ];
 
+type ReportTab = 'monthly' | 'daily' | 'top';
+type SummaryColor = 'primary' | 'warning' | 'danger' | 'success' | 'gray';
+type IconComponent = ComponentType<{ className?: string }>;
+
+interface DailyCategoryStat {
+  category: DowntimeCategory;
+  hours?: number;
+  count: number;
+}
+
+interface DailyKPIResponse {
+  total_hours?: number;
+  total_events?: number;
+  availability_pct?: number;
+  by_category?: DailyCategoryStat[];
+}
+
+interface TopCause {
+  sub_category: string;
+  category: DowntimeCategory;
+  count: number;
+  total_hours?: number;
+}
+
+interface TopCausesResponse {
+  top_causes?: TopCause[];
+}
+
 export function ReportsPage() {
   const [kpiData, setKpiData] = useState<KPIMonthlyResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -41,9 +70,9 @@ export function ReportsPage() {
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
   const [selectedLine, setSelectedLine] = useState<string>('');
-  const [activeTab, setActiveTab] = useState<'monthly' | 'daily' | 'top'>('monthly');
-  const [dailyData, setDailyData] = useState<any>(null);
-  const [topCausesData, setTopCausesData] = useState<any>(null);
+  const [activeTab, setActiveTab] = useState<ReportTab>('monthly');
+  const [dailyData, setDailyData] = useState<DailyKPIResponse | null>(null);
+  const [topCausesData, setTopCausesData] = useState<TopCausesResponse | null>(null);
   const [sectionError, setSectionError] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState(false);
   const [exportSuccess, setExportSuccess] = useState<string | null>(null);
@@ -52,18 +81,18 @@ export function ReportsPage() {
   const months = Array.from({ length: 12 }, (_, i) => i + 1);
   const lines = ['', 'SMT-01', 'SMT-02', 'ASSEMBLY-01', 'ASSEMBLY-02', 'INJECTION-01'];
 
-  const fetchMonthlyKPI = async () => {
+  const fetchMonthlyKPI = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
       const response = await downtimeApi.getMonthlyKPI(selectedYear, selectedMonth);
       setKpiData(response.data);
-    } catch (err: any) {
-      setError(err.response?.data?.detail || 'Greška pri učitavanju izveštaja');
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, 'Greška pri učitavanju izveštaja'));
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [selectedYear, selectedMonth]);
 
   const handleExport = async () => {
     setIsExporting(true);
@@ -77,39 +106,39 @@ export function ReportsPage() {
       });
       setExportSuccess(filename);
       setTimeout(() => setExportSuccess(null), 4000);
-    } catch (err: any) {
-      setError('Greška pri eksportu izveštaja: ' + (err.message || 'nepoznata greška'));
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, 'Greška pri eksportu izveštaja'));
     } finally {
       setIsExporting(false);
     }
   };
 
-  const fetchDailyKPI = async () => {
+  const fetchDailyKPI = useCallback(async () => {
     try {
       setSectionError(null);
       const dateStr = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-01`;
       const response = await kpiApi.daily(dateStr);
-      setDailyData(response.data);
-    } catch (err: any) {
-      setSectionError(err?.response?.data?.detail || 'Greška pri učitavanju dnevnog KPI');
+      setDailyData(response.data as DailyKPIResponse);
+    } catch (err: unknown) {
+      setSectionError(getApiErrorMessage(err, 'Greška pri učitavanju dnevnog KPI'));
     }
-  };
+  }, [selectedYear, selectedMonth]);
 
-  const fetchTopCauses = async () => {
+  const fetchTopCauses = useCallback(async () => {
     try {
       setSectionError(null);
       const response = await kpiApi.topCauses(30, 15);
-      setTopCausesData(response.data);
-    } catch (err: any) {
-      setSectionError(err?.response?.data?.detail || 'Greška pri učitavanju top uzroka');
+      setTopCausesData(response.data as TopCausesResponse);
+    } catch (err: unknown) {
+      setSectionError(getApiErrorMessage(err, 'Greška pri učitavanju top uzroka'));
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchMonthlyKPI();
     fetchDailyKPI();
     fetchTopCauses();
-  }, [selectedYear, selectedMonth]);
+  }, [fetchMonthlyKPI, fetchDailyKPI, fetchTopCauses]);
 
   if (isLoading && !kpiData) {
     return (
@@ -219,7 +248,7 @@ export function ReportsPage() {
               key={tab.id}
               role="tab"
               aria-selected={activeTab === tab.id}
-              onClick={() => setActiveTab(tab.id as any)}
+              onClick={() => setActiveTab(tab.id as ReportTab)}
               className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
                 activeTab === tab.id
                   ? 'border-primary-600 text-primary-600'
@@ -410,7 +439,7 @@ function MonthlyTab({ data }: { data: KPIMonthlyResponse }) {
                   <tr key={cat.category} className="hover:bg-gray-50">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
-                        <Badge variant={getCategoryColor(cat.category) as any}>
+                        <Badge variant={getCategoryColor(cat.category)}>
                           {getCategoryLabel(cat.category)}
                         </Badge>
                       </div>
@@ -429,7 +458,7 @@ function MonthlyTab({ data }: { data: KPIMonthlyResponse }) {
   );
 }
 
-function DailyTab({ data }: { data: any }) {
+function DailyTab({ data }: { data: DailyKPIResponse }) {
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -444,9 +473,9 @@ function DailyTab({ data }: { data: any }) {
         </CardHeader>
         <CardBody>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {data.by_category?.map((cat: any) => (
+            {data.by_category?.map((cat) => (
               <div key={cat.category} className="p-4 rounded-lg bg-gray-50">
-                <Badge variant={getCategoryColor(cat.category) as any} className="mb-2">
+                <Badge variant={getCategoryColor(cat.category)} className="mb-2">
                   {getCategoryLabel(cat.category)}
                 </Badge>
                 <p className="text-2xl font-bold text-gray-900">{cat.hours?.toFixed(1) || 0}h</p>
@@ -460,7 +489,7 @@ function DailyTab({ data }: { data: any }) {
   );
 }
 
-function TopCausesTab({ data }: { data: any }) {
+function TopCausesTab({ data }: { data: TopCausesResponse }) {
   return (
     <div className="space-y-6">
       <Card>
@@ -480,14 +509,14 @@ function TopCausesTab({ data }: { data: any }) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {data.top_causes?.map((cause: any, i: number) => (
+                {data.top_causes?.map((cause, i) => (
                   <tr key={cause.sub_category} className="hover:bg-gray-50">
                     <td className="px-6 py-4 text-sm text-gray-500">{i + 1}</td>
                     <td className="px-6 py-4 font-medium text-gray-900">
                       {cause.sub_category.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())}
                     </td>
                     <td className="px-6 py-4">
-                      <Badge variant={getCategoryColor(cause.category) as any}>
+                      <Badge variant={getCategoryColor(cause.category)}>
                         {getCategoryLabel(cause.category)}
                       </Badge>
                     </td>
@@ -506,7 +535,7 @@ function TopCausesTab({ data }: { data: any }) {
 
 export default ReportsPage;
 
-function SummaryCard({ title, value, icon: Icon, color }: { title: string; value: string; icon: any; color: string }) {
+function SummaryCard({ title, value, icon: Icon, color }: { title: string; value: string; icon: IconComponent; color: SummaryColor }) {
   const colors = {
     primary: 'bg-primary-50 text-primary-600 border-primary-200',
     warning: 'bg-warning-50 text-warning-600 border-warning-200',

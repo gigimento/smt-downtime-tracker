@@ -190,3 +190,13 @@ export const shiftApi = {
 };
 
 export default api;
+
+export function getApiErrorMessage(error: unknown, fallback: string): string {
+  if (axios.isAxiosError(error)) {
+    const data = error.response?.data;
+    if (data && typeof data === 'object' && 'detail' in data && typeof data.detail === 'string') {
+      return data.detail;
+    }
+  }
+  return fallback;
+}
