@@ -1,18 +1,16 @@
-version: "3.8"
-
 services:
   postgres:
     image: postgres:16-alpine
     environment:
       POSTGRES_DB: downtime_tracker
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-change_me_postgres_pass}
+      POSTGRES_USER: smt_user
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U smt_user -d downtime_tracker"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -21,16 +19,22 @@ services:
   backend:
     build: ./backend
     environment:
-      DATABASE_URL: "postgresql+asyncpg://postgres:${DB_PASSWORD:-change_me_postgres_pass}@postgres:5432/downtime_tracker"
+      DATABASE_URL: "postgresql+asyncpg://smt_user:${DB_PASSWORD:?DB_PASSWORD is required}@postgres:5432/downtime_tracker"
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
       TELEGRAM_FORUM_CHAT_ID: ${TELEGRAM_FORUM_CHAT_ID:-0}
       TOPIC_MAINTENANCE: ${TOPIC_MAINTENANCE:-0}
       TOPIC_PROCESS: ${TOPIC_PROCESS:-0}
       TOPIC_PRODUCTION: ${TOPIC_PRODUCTION:-0}
       TOPIC_QUALITY: ${TOPIC_QUALITY:-0}
-      JWT_SECRET: ${JWT_SECRET:-change-me-in-production-min-32-chars!!}
-      CORS_ORIGINS: '["http://localhost:5173","http://localhost:3000","http://localhost"]'
-      DEBUG: "true"
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      CORS_ORIGINS: ${CORS_ORIGINS:-["http://localhost:3000","http://localhost"]}
+      REQUIRE_PIN_FOR_LOGIN: ${REQUIRE_PIN_FOR_LOGIN:-true}
+      ENVIRONMENT: production
+      DEBUG: "false"
+      AUTO_CREATE_TABLES: ${AUTO_CREATE_TABLES:-true}
+      RUN_BACKGROUND_WORKERS: ${RUN_BACKGROUND_WORKERS:-true}
+      ENABLE_MES_ENDPOINT: ${ENABLE_MES_ENDPOINT:-false}
+      MES_API_KEY: ${MES_API_KEY:-}
     ports:
       - "8000:8000"
     depends_on:

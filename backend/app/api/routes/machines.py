@@ -7,6 +7,7 @@ from app.database import get_db
 from app.core.dependencies import get_current_active_user, require_admin
 from app.models.user import User
 from app.models.machine import Machine, MachineType
+from app.models.downtime import DowntimeEvent
 from app.schemas.machine import MachineCreate, MachineUpdate, MachineResponse
 
 router = APIRouter(prefix="/machines", tags=["machines"])
@@ -97,6 +98,12 @@ async def delete_machine(
     machine = result.scalar_one_or_none()
     if not machine:
         raise HTTPException(status_code=404, detail="Machine not found")
-    
-    await db.delete(machine)
+
+    event_count = await db.scalar(
+        select(func.count()).select_from(DowntimeEvent).where(DowntimeEvent.machine_id == machine_id)
+    )
+    if event_count:
+        machine.is_active = False
+    else:
+        await db.delete(machine)
     await db.commit()

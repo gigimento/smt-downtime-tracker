@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import type { ComponentType, Dispatch, ReactNode, SetStateAction } from 'react';
 import { Plus, Edit2, Trash2, Loader2, Save, X, Users, Cpu, Shield, Calendar } from 'lucide-react';
-import { usersApi, machinesApi } from '../services/api';
+import { getApiErrorMessage, usersApi, machinesApi } from '../services/api';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Input';
@@ -21,7 +22,10 @@ const emptyUserForm: UserForm = { badge_code: '', full_name: '', team_id: '', ro
 const emptyTeamForm: TeamForm = { code: '', name: '', telegram_topic_id: null, pin_code: '' };
 const emptyMachineForm: MachineForm = { code: '', name: '', line: '', type: 'DECAN_S2', is_active: true };
 
-const TABS: { id: TabType; label: string; icon: any }[] = [
+type IconComponent = ComponentType<{ className?: string }>;
+type MessageSetter = Dispatch<SetStateAction<string | null>>;
+
+const TABS: { id: TabType; label: string; icon: IconComponent }[] = [
   { id: 'users', label: 'Korisnici', icon: Users },
   { id: 'teams', label: 'Timovi', icon: Shield },
   { id: 'machines', label: 'Mašine', icon: Cpu },
@@ -43,11 +47,7 @@ export function AdminPage() {
   // Machines
   const [machines, setMachines] = useState<Machine[]>([]);
 
-  useEffect(() => {
-    loadData();
-  }, [activeTab]);
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
@@ -61,12 +61,16 @@ export function AdminPage() {
         const r = await machinesApi.list();
         setMachines(r.data);
       }
-    } catch (err: any) {
-      setError(err.response?.data?.detail || 'Greška pri učitavanju');
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, 'Greška pri učitavanju'));
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [activeTab]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   return (
     <div className="space-y-6">
@@ -96,7 +100,21 @@ export function AdminPage() {
   );
 }
 
-function UserSection({ users, teams, isLoading, onRefresh, setError, setSuccess }: any) {
+function UserSection({
+  users,
+  teams,
+  isLoading,
+  onRefresh,
+  setError,
+  setSuccess,
+}: {
+  users: User[];
+  teams: Team[];
+  isLoading: boolean;
+  onRefresh: () => void;
+  setError: MessageSetter;
+  setSuccess: MessageSetter;
+}) {
   const [modal, setModal] = useState(false);
   const [editing, setEditing] = useState<User | null>(null);
   const [form, setForm] = useState<UserForm>({ badge_code: '', full_name: '', team_id: '', role: 'operator', pin_code: '', is_active: true });
@@ -109,13 +127,13 @@ function UserSection({ users, teams, isLoading, onRefresh, setError, setSuccess 
       if (editing) { await usersApi.update(editing.id, form); setSuccess('Korisnik ažuriran'); }
       else { await usersApi.create(form); setSuccess('Korisnik kreiran'); }
       setModal(false); onRefresh();
-    } catch (err: any) { setError(err.response?.data?.detail || 'Greška'); }
+    } catch (err: unknown) { setError(getApiErrorMessage(err, 'Greška')); }
   };
 
   const remove = async (id: string) => {
-    if (!confirm('Sigurno obrisati korisnika?')) return;
-    try { await usersApi.delete(id); setSuccess('Korisnik obrisan'); onRefresh(); }
-    catch (err: any) { setError(err.response?.data?.detail || 'Greška'); }
+    if (!confirm('Deaktivirati korisnika ako ima istoriju, ili obrisati ako nema zapisa?')) return;
+    try { await usersApi.delete(id); setSuccess('Korisnik uklonjen ili deaktiviran'); onRefresh(); }
+    catch (err: unknown) { setError(getApiErrorMessage(err, 'Greška')); }
   };
 
   return (
@@ -151,13 +169,13 @@ function UserSection({ users, teams, isLoading, onRefresh, setError, setSuccess 
         </div>}
       </CardBody>
       {modal && <FormModal title={editing ? 'Izmeni korisnika' : 'Novi korisnik'} onClose={() => setModal(false)} onSave={save}>
-        <Input placeholder="Barkod kod" value={form.badge_code} onChange={(e: any) => setForm({ ...form, badge_code: e.target.value })} required />
-        <Input placeholder="Ime i prezime" value={form.full_name} onChange={(e: any) => setForm({ ...form, full_name: e.target.value })} required />
-        <Select value={form.team_id} onChange={(e: any) => setForm({ ...form, team_id: e.target.value })}>
+        <Input placeholder="Barkod kod" value={form.badge_code} onChange={(e) => setForm({ ...form, badge_code: e.target.value })} required />
+        <Input placeholder="Ime i prezime" value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} required />
+        <Select value={form.team_id} onChange={(e) => setForm({ ...form, team_id: e.target.value })}>
           <option value="">Bez tima</option>
           {teams.map((t: Team) => <option key={t.id} value={t.id}>{t.name} ({t.code})</option>)}
         </Select>
-        <Select value={form.role} onChange={(e: any) => setForm({ ...form, role: e.target.value })}>
+        <Select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as UserRole })}>
           <option value="operator">Operater</option>
           <option value="maintenance">Održavanje</option>
           <option value="process">Proces</option>
@@ -165,13 +183,25 @@ function UserSection({ users, teams, isLoading, onRefresh, setError, setSuccess 
           <option value="quality">Kvalitet</option>
           <option value="admin">Admin</option>
         </Select>
-        <Input type="password" placeholder="PIN kod (opciono)" value={form.pin_code} onChange={(e: any) => setForm({ ...form, pin_code: e.target.value })} />
+        <Input type="password" placeholder="PIN kod (opciono)" value={form.pin_code} onChange={(e) => setForm({ ...form, pin_code: e.target.value })} />
       </FormModal>}
     </Card>
   );
 }
 
-function TeamSection({ teams, isLoading, onRefresh, setError, setSuccess }: any) {
+function TeamSection({
+  teams,
+  isLoading,
+  onRefresh,
+  setError,
+  setSuccess,
+}: {
+  teams: Team[];
+  isLoading: boolean;
+  onRefresh: () => void;
+  setError: MessageSetter;
+  setSuccess: MessageSetter;
+}) {
   const [modal, setModal] = useState(false);
   const [editing, setEditing] = useState<Team | null>(null);
   const [form, setForm] = useState<TeamForm>({ code: '', name: '', telegram_topic_id: null, pin_code: '' });
@@ -190,7 +220,7 @@ function TeamSection({ teams, isLoading, onRefresh, setError, setSuccess }: any)
       if (editing) { await usersApi.updateTeam(editing.id, payload); setSuccess('Tim ažuriran'); }
       else { await usersApi.createTeam(payload); setSuccess('Tim kreiran'); }
       setModal(false); onRefresh();
-    } catch (err: any) { setError(err.response?.data?.detail || 'Greška'); }
+    } catch (err: unknown) { setError(getApiErrorMessage(err, 'Greška')); }
   };
 
   return (
@@ -211,16 +241,28 @@ function TeamSection({ teams, isLoading, onRefresh, setError, setSuccess }: any)
         </div>}
       </CardBody>
       {modal && <FormModal title={editing ? 'Izmeni tim' : 'Novi tim'} onClose={() => setModal(false)} onSave={save}>
-        <Input placeholder="Kod tima (npr. MAINT)" value={form.code} onChange={(e: any) => setForm({ ...form, code: e.target.value })} required />
-        <Input placeholder="Naziv" value={form.name} onChange={(e: any) => setForm({ ...form, name: e.target.value })} required />
-        <Input type="number" placeholder="Telegram Topic ID" value={form.telegram_topic_id ?? ''} onChange={(e: any) => setForm({ ...form, telegram_topic_id: e.target.value ? Number(e.target.value) : null })} />
-        <Input type="password" placeholder="PIN kod tima" value={form.pin_code} onChange={(e: any) => setForm({ ...form, pin_code: e.target.value })} />
+        <Input placeholder="Kod tima (npr. MAINT)" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} required />
+        <Input placeholder="Naziv" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
+        <Input type="number" placeholder="Telegram Topic ID" value={form.telegram_topic_id ?? ''} onChange={(e) => setForm({ ...form, telegram_topic_id: e.target.value ? Number(e.target.value) : null })} />
+        <Input type="password" placeholder="PIN kod tima" value={form.pin_code} onChange={(e) => setForm({ ...form, pin_code: e.target.value })} />
       </FormModal>}
     </Card>
   );
 }
 
-function MachineSection({ machines, isLoading, onRefresh, setError, setSuccess }: any) {
+function MachineSection({
+  machines,
+  isLoading,
+  onRefresh,
+  setError,
+  setSuccess,
+}: {
+  machines: Machine[];
+  isLoading: boolean;
+  onRefresh: () => void;
+  setError: MessageSetter;
+  setSuccess: MessageSetter;
+}) {
   const [modal, setModal] = useState(false);
   const [editing, setEditing] = useState<Machine | null>(null);
   const [form, setForm] = useState<MachineForm>({ code: '', name: '', line: '', type: 'DECAN_S2', is_active: true });
@@ -233,13 +275,13 @@ function MachineSection({ machines, isLoading, onRefresh, setError, setSuccess }
       if (editing) { await machinesApi.update(editing.id, form); setSuccess('Mašina ažurirana'); }
       else { await machinesApi.create(form); setSuccess('Mašina kreirana'); }
       setModal(false); onRefresh();
-    } catch (err: any) { setError(err.response?.data?.detail || 'Greška'); }
+    } catch (err: unknown) { setError(getApiErrorMessage(err, 'Greška')); }
   };
 
   const remove = async (id: string) => {
-    if (!confirm('Sigurno obrisati mašinu?')) return;
-    try { await machinesApi.delete(id); setSuccess('Mašina obrisana'); onRefresh(); }
-    catch (err: any) { setError(err.response?.data?.detail || 'Greška'); }
+    if (!confirm('Deaktivirati mašinu ako ima istoriju, ili obrisati ako nema zapisa?')) return;
+    try { await machinesApi.delete(id); setSuccess('Mašina uklonjena ili deaktivirana'); onRefresh(); }
+    catch (err: unknown) { setError(getApiErrorMessage(err, 'Greška')); }
   };
 
   return (
@@ -267,10 +309,10 @@ function MachineSection({ machines, isLoading, onRefresh, setError, setSuccess }
         </div>}
       </CardBody>
       {modal && <FormModal title={editing ? 'Izmeni mašinu' : 'Nova mašina'} onClose={() => setModal(false)} onSave={save}>
-        <Input placeholder="Kod (npr. DECAN-S2-01)" value={form.code} onChange={(e: any) => setForm({ ...form, code: e.target.value })} required />
-        <Input placeholder="Naziv" value={form.name} onChange={(e: any) => setForm({ ...form, name: e.target.value })} required />
-        <Input placeholder="Linija (npr. SMT-01)" value={form.line} onChange={(e: any) => setForm({ ...form, line: e.target.value })} />
-        <Select value={form.type} onChange={(e: any) => setForm({ ...form, type: e.target.value })}>
+        <Input placeholder="Kod (npr. DECAN-S2-01)" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} required />
+        <Input placeholder="Naziv" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
+        <Input placeholder="Linija (npr. SMT-01)" value={form.line} onChange={(e) => setForm({ ...form, line: e.target.value })} />
+        <Select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value as MachineType })}>
           <option value="DECAN_S2">DECAN S2</option><option value="DECAN_L2">DECAN L2</option>
           <option value="CONVEYOR">Conveyor</option><option value="OTHER">Ostalo</option>
         </Select>
@@ -281,7 +323,7 @@ function MachineSection({ machines, isLoading, onRefresh, setError, setSuccess }
 
 export default AdminPage;
 
-function FormModal({ title, children, onClose, onSave }: { title: string; children: any; onClose: () => void; onSave: () => void }) {
+function FormModal({ title, children, onClose, onSave }: { title: string; children: ReactNode; onClose: () => void; onSave: () => void }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
       <div className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4" onClick={(e) => e.stopPropagation()}>

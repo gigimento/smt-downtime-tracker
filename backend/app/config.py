@@ -1,5 +1,5 @@
+from pydantic import model_validator
 from pydantic_settings import BaseSettings
-from typing import Optional
 from pathlib import Path
 
 # Get the directory where this config.py file is located (backend/app)
@@ -29,13 +29,19 @@ class Settings(BaseSettings):
     JWT_SECRET: str = "change-me-in-production-min-32-chars"
     JWT_ALGORITHM: str = "HS256"
     JWT_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 days
+    REQUIRE_PIN_FOR_LOGIN: bool = False
     
     # CORS
     CORS_ORIGINS: list[str] = ["http://localhost:5173", "http://localhost:3000"]
     
     # App
     APP_NAME: str = "SMT Downtime Tracker"
+    ENVIRONMENT: str = "development"
     DEBUG: bool = True
+    RUN_BACKGROUND_WORKERS: bool = True
+    AUTO_CREATE_TABLES: bool = False
+    ENABLE_MES_ENDPOINT: bool = False
+    MES_API_KEY: str = ""
     
     # Work schedule (default 08-16, Monday-Friday only)
     WORK_DAY_START_HOUR: int = 8
@@ -49,6 +55,34 @@ class Settings(BaseSettings):
     class Config:
         env_file = str(ENV_FILE)
         case_sensitive = True
+
+    @property
+    def is_production(self) -> bool:
+        return self.ENVIRONMENT.lower() in {"production", "prod"}
+
+    @model_validator(mode="after")
+    def validate_production_settings(self) -> "Settings":
+        if not self.is_production:
+            return self
+
+        if self.DEBUG:
+            raise ValueError("DEBUG must be false in production")
+        if self.JWT_SECRET in {
+            "change-me-in-production-min-32-chars",
+            "change-me-in-production-min-32-chars!!",
+            "replace-with-at-least-32-random-characters",
+        }:
+            raise ValueError("JWT_SECRET must be changed in production")
+        if len(self.JWT_SECRET) < 32:
+            raise ValueError("JWT_SECRET must be at least 32 characters in production")
+        if self.DATABASE_URL.startswith("sqlite"):
+            raise ValueError("SQLite DATABASE_URL is not allowed in production")
+        if not self.REQUIRE_PIN_FOR_LOGIN:
+            raise ValueError("REQUIRE_PIN_FOR_LOGIN must be true in production")
+        if self.ENABLE_MES_ENDPOINT and len(self.MES_API_KEY) < 32:
+            raise ValueError("MES_API_KEY must be at least 32 characters when MES endpoint is enabled in production")
+
+        return self
 
 
 settings = Settings()

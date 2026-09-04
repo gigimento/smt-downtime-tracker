@@ -1,7 +1,7 @@
 import { useState, FormEvent, useRef, useEffect } from 'react';
 import { ArrowRight, AlertCircle, CheckCircle, User } from 'lucide-react';
-import { downtimeApi, machinesApi } from '../services/api';
-import { useAuth } from '../context/AuthContext';
+import { downtimeApi, machinesApi, getApiErrorMessage } from '../services/api';
+import { useAuth } from '../context/useAuth';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Input';
@@ -86,8 +86,8 @@ export function ScanPage() {
         document.getElementById('machine-code')?.focus();
       }, 100);
       
-    } catch (err: any) {
-      setError(err.response?.data?.detail || 'Greška pri otvaranju zastoja. Pokušajte ponovo.');
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, 'Greška pri otvaranju zastoja. Pokušajte ponovo.'));
     } finally {
       setIsSubmitting(false);
     }
@@ -266,7 +266,7 @@ export function ScanPage() {
               { cat: 'unplanned_other', teams: 'Proces' },
             ] as const).map(({ cat, teams }) => (
               <div key={cat} className="flex items-center gap-2">
-                <Badge variant={getCategoryColor(cat) as any}>{getCategoryLabel(cat)}</Badge>
+                <Badge variant={getCategoryColor(cat)}>{getCategoryLabel(cat)}</Badge>
                 <span className="text-gray-500">→ {teams}</span>
               </div>
             ))}

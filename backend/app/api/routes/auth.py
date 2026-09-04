@@ -6,6 +6,7 @@ import uuid
 from app.database import get_db
 from app.core.security import get_password_hash, verify_password, create_token_for_user
 from app.core.dependencies import get_current_active_user
+from app.config import settings
 from app.models.user import User, UserRole
 from app.schemas.auth import Token, LoginRequest
 from app.schemas.user import UserResponse
@@ -26,7 +27,13 @@ async def login(request: LoginRequest, db: AsyncSession = Depends(get_db)):
             detail="Invalid badge code or PIN",
         )
     
-    # Verify PIN if provided (team PIN or personal PIN)
+    # Verify PIN when required, or when provided voluntarily.
+    if settings.REQUIRE_PIN_FOR_LOGIN and not request.pin_code:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid badge code or PIN",
+        )
+
     if request.pin_code:
         pin_valid = False
         if user.pin_code and verify_password(request.pin_code, user.pin_code):

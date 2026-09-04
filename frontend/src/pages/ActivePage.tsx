@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Loader2, Clock, AlertCircle, CheckCircle, RotateCcw, ExternalLink } from 'lucide-react';
-import { downtimeApi } from '../services/api';
+import { downtimeApi, getApiErrorMessage } from '../services/api';
 import { Card, CardBody } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
@@ -22,8 +22,8 @@ export function ActivePage() {
       setDowntimes(response.data);
       setError(null);
       setLastRefresh(new Date());
-    } catch (err: any) {
-      setError(err.response?.data?.detail || 'Greška pri učitavanju aktivnih zastoja');
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, 'Greška pri učitavanju aktivnih zastoja'));
     } finally {
       setIsLoading(false);
     }
@@ -45,8 +45,8 @@ export function ActivePage() {
     try {
       await downtimeApi.acknowledge(id);
       fetchActive();
-    } catch (err: any) {
-      setError(err.response?.data?.detail || 'Greška pri potvrđivanju');
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, 'Greška pri potvrđivanju'));
     }
   };
 
@@ -129,7 +129,7 @@ export function ActivePage() {
                       </div>
 
                       {/* Category badge */}
-                      <Badge variant={getCategoryColor(dt.category) as any}>
+                      <Badge variant={getCategoryColor(dt.category)}>
                         {getCategoryLabel(dt.category)}
                         {dt.sub_category && ` • ${dt.sub_category.replace(/_/g, ' ')}`}
                       </Badge>

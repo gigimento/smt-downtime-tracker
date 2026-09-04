@@ -1,6 +1,8 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from sqlalchemy import text
 from app.config import settings
 from app.database import init_db, engine
 from app.api.routes import auth, downtime, machines, users, kpi, mes, export, shift_overrides, websocket as ws_routes
@@ -26,8 +28,11 @@ async def lifespan(app: FastAPI):
 
     # Start bot polling in background
     global bot_polling_task, escalation_task
-    bot_polling_task = asyncio.create_task(start_bot_polling())
-    await start_escalation_worker()
+    if settings.RUN_BACKGROUND_WORKERS:
+        bot_polling_task = asyncio.create_task(start_bot_polling())
+        await start_escalation_worker()
+    else:
+        logger.info("Background workers disabled")
 
     yield
 
@@ -79,6 +84,20 @@ app.include_router(ws_routes.router)  # WebSocket at /ws (not /api/ws)
 
 @app.get("/health")
 async def health_check():
+    try:
+        async with engine.connect() as conn:
+            await conn.execute(text("SELECT 1"))
+    except Exception as exc:
+        logger.exception("Health check failed")
+        return JSONResponse(
+            status_code=503,
+            content={
+                "status": "error",
+                "service": "smt-downtime-tracker",
+                "detail": exc.__class__.__name__,
+            },
+        )
+
     return {"status": "ok", "service": "smt-downtime-tracker"}
 
 

@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, useLocation, Outlet, useNavigate } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../context/useAuth';
 import { cn } from '../../lib/utils';
 import { getRoleLabel } from '../../lib/utils';
 import { downtimeApi } from '../../services/api';
-import type { DowntimeListItem } from '../../types';
+import type { DowntimeCategory, DowntimeListItem } from '../../types';
 import {
   Activity,
   CheckCircle,
@@ -32,6 +32,16 @@ const navigation = [
 const WS_URL = (import.meta.env.VITE_API_URL || 'http://localhost:8000').replace(/^http/, 'ws') + '/ws';
 
 type WSState = 'connecting' | 'open' | 'closed' | 'error';
+type WebSocketDowntimeItem = Partial<DowntimeListItem> & {
+  id: string;
+  machine_code?: string;
+  category?: DowntimeCategory;
+  elapsed_seconds?: number;
+};
+type DowntimeWebSocketMessage = {
+  type?: string;
+  items?: WebSocketDowntimeItem[];
+};
 
 function FloatingTicker() {
   const navigate = useNavigate();
@@ -46,16 +56,16 @@ function FloatingTicker() {
   const reconnectAttemptRef = useRef(0);
 
   // Helper: konvertuj WS item u DowntimeListItem (za prikaz)
-  const mapWsItem = (item: any): Partial<DowntimeListItem> & { started_at: string } => ({
+  const mapWsItem = (item: WebSocketDowntimeItem): DowntimeListItem => ({
     id: item.id,
     machine_code: item.machine_code || '',
     machine_name: item.machine_code || '',
     line: null,
     opened_by_name: item.opened_by_name || '',
-    category: item.category,
-    sub_category: item.sub_category,
-    problem_description: item.problem_description,
-    started_at: item.started_at,
+    category: item.category || 'unplanned_other',
+    sub_category: item.sub_category ?? null,
+    problem_description: item.problem_description ?? null,
+    started_at: item.started_at || new Date().toISOString(),
     duration_seconds: item.elapsed_seconds || 0,
     duration_formatted: '',
     is_active: true,
@@ -91,13 +101,13 @@ function FloatingTicker() {
         ws.onmessage = (event) => {
           if (cancelled) return;
           try {
-            const msg = JSON.parse(event.data);
+            const msg = JSON.parse(event.data) as DowntimeWebSocketMessage;
             if (msg.type === 'active_update' && Array.isArray(msg.items)) {
               // Mapiramo WS items u oblik koji FloatingTicker očekuje
-              setActiveDowntimes(msg.items.map((i: any) => mapWsItem(i) as DowntimeListItem));
+              setActiveDowntimes(msg.items.map(mapWsItem));
             } else if (msg.type === 'downtime_opened' || msg.type === 'downtime_closed' || msg.type === 'downtime_acknowledged') {
               if (Array.isArray(msg.items)) {
-                setActiveDowntimes(msg.items.map((i: any) => mapWsItem(i) as DowntimeListItem));
+                setActiveDowntimes(msg.items.map(mapWsItem));
               }
             }
             // 'pong' / 'keepalive' ignorišemo

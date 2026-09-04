@@ -1,8 +1,10 @@
 import { HTMLAttributes, forwardRef } from 'react';
 import { cn } from '../../lib/utils';
 
+export type BadgeVariant = 'primary' | 'danger' | 'success' | 'warning' | 'gray';
+
 interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {
-  variant?: 'primary' | 'danger' | 'success' | 'warning' | 'gray';
+  variant?: BadgeVariant;
 }
 
 export const Badge = forwardRef<HTMLSpanElement, BadgeProps>(

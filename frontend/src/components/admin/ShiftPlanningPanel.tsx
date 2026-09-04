@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import type { ComponentType } from 'react';
 import {
   Calendar,
   Loader2,
@@ -14,11 +15,13 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { shiftApi } from '../../services/api';
+import { getApiErrorMessage } from '../../services/api';
 import { Card, CardBody, CardHeader } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Select } from '../ui/Input';
 import { Badge } from '../ui/Badge';
 import type { MonthPlan, PlanDayInfo, ShiftOverrideType } from '../../types';
+import type { BadgeVariant } from '../ui/Badge';
 
 const MONTH_NAMES = [
   '', 'Januar', 'Februar', 'Mart', 'April', 'Maj', 'Jun',
@@ -27,10 +30,12 @@ const MONTH_NAMES = [
 
 const DAY_NAMES = ['Pon', 'Uto', 'Sre', 'Čet', 'Pet', 'Sub', 'Ned'];
 
-const OVERRIDE_LABELS: Record<ShiftOverrideType, { label: string; color: string; icon: any }> = {
-  force_workday: { label: 'Radni dan', color: 'bg-success-100 text-success-800', icon: Briefcase },
-  force_free_shift: { label: 'Slobodno', color: 'bg-warning-100 text-warning-800', icon: Coffee },
-  force_weekend: { label: 'Vikend', color: 'bg-gray-200 text-gray-800', icon: TreePine },
+type IconComponent = ComponentType<{ className?: string }>;
+
+const OVERRIDE_LABELS: Record<ShiftOverrideType, { label: string; variant: BadgeVariant; icon: IconComponent }> = {
+  force_workday: { label: 'Radni dan', variant: 'success', icon: Briefcase },
+  force_free_shift: { label: 'Slobodno', variant: 'warning', icon: Coffee },
+  force_weekend: { label: 'Vikend', variant: 'gray', icon: TreePine },
 };
 
 export function ShiftPlanningPanel() {
@@ -44,22 +49,22 @@ export function ShiftPlanningPanel() {
   const [success, setSuccess] = useState<string | null>(null);
   const [selectedDay, setSelectedDay] = useState<PlanDayInfo | null>(null);
 
-  useEffect(() => {
-    loadPlan();
-  }, [year, month]);
-
-  const loadPlan = async () => {
+  const loadPlan = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
       const response = await shiftApi.previewPlan(year, month);
       setPlan(response.data);
-    } catch (err: any) {
-      setError(err.response?.data?.detail || 'Greška pri učitavanju plana');
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, 'Greška pri učitavanju plana'));
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [year, month]);
+
+  useEffect(() => {
+    loadPlan();
+  }, [loadPlan]);
 
   const handleApplyPlan = async (dryRun: boolean = false) => {
     setIsApplying(true);
@@ -78,8 +83,8 @@ export function ShiftPlanningPanel() {
         );
         await loadPlan();
       }
-    } catch (err: any) {
-      setError(err.response?.data?.detail || 'Greška pri primeni plana');
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, 'Greška pri primeni plana'));
     } finally {
       setIsApplying(false);
     }
@@ -91,8 +96,8 @@ export function ShiftPlanningPanel() {
       setSuccess(`Override za ${date} uspešno dodat`);
       setSelectedDay(null);
       await loadPlan();
-    } catch (err: any) {
-      setError(err.response?.data?.detail || 'Greška pri kreiranju');
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, 'Greška pri kreiranju'));
     }
   };
 
@@ -102,8 +107,8 @@ export function ShiftPlanningPanel() {
       await shiftApi.deleteOverride(id);
       setSuccess('Override obrisan');
       await loadPlan();
-    } catch (err: any) {
-      setError(err.response?.data?.detail || 'Greška pri brisanju');
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, 'Greška pri brisanju'));
     }
   };
 
@@ -303,7 +308,7 @@ export function ShiftPlanningPanel() {
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
-                        <Badge variant={overrideInfo.color.includes('success') ? 'success' : overrideInfo.color.includes('warning') ? 'warning' : 'gray' as any}>
+                        <Badge variant={overrideInfo.variant}>
                           {overrideInfo.label}
                         </Badge>
                         <Button
@@ -382,7 +387,7 @@ function DayCell({ day, onClick }: { day: PlanDayInfo; onClick: () => void }) {
   );
 }
 
-function StatCard({ label, value, icon: Icon, color }: any) {
+function StatCard({ label, value, icon: Icon, color }: { label: string; value: number; icon: IconComponent; color: string }) {
   const colors: Record<string, string> = {
     success: 'bg-success-50 text-success-700 border-success-200',
     warning: 'bg-warning-50 text-warning-700 border-warning-200',

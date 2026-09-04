@@ -1,7 +1,7 @@
-import { useState, useEffect, FormEvent } from 'react';
+import { useState, useEffect, useCallback, FormEvent } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Loader2, AlertCircle, CheckCircle, Lock, ArrowLeft, X } from 'lucide-react';
-import { downtimeApi } from '../services/api';
+import { downtimeApi, getApiErrorMessage } from '../services/api';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Textarea } from '../components/ui/Input';
@@ -24,22 +24,22 @@ export function ClosePage() {
   const [closureComment, setClosureComment] = useState('');
   const [showCodeHint, setShowCodeHint] = useState(false);
 
-  useEffect(() => {
-    if (!id) return;
-    fetchDowntime();
-  }, [id]);
-
-  const fetchDowntime = async () => {
+  const fetchDowntime = useCallback(async () => {
     try {
       if (!id) return;
       const response = await downtimeApi.get(id);
       setDowntime(response.data);
-    } catch (err: any) {
-      setError(err.response?.data?.detail || 'Greška pri učitavanju zastoja.');
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, 'Greška pri učitavanju zastoja.'));
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [id]);
+
+  useEffect(() => {
+    if (!id) return;
+    fetchDowntime();
+  }, [fetchDowntime, id]);
 
   const handleClose = async (e: FormEvent) => {
     e.preventDefault();
@@ -57,8 +57,8 @@ export function ClosePage() {
       
       setSuccess('Zastoj uspešno zatvoren!');
       setTimeout(() => navigate('/active'), 1500);
-    } catch (err: any) {
-      setError(err.response?.data?.detail || 'Greška pri zatvaranju. Proverite šifru.');
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, 'Greška pri zatvaranju. Proverite šifru.'));
     } finally {
       setIsClosing(false);
     }
@@ -113,7 +113,7 @@ export function ClosePage() {
         <CardHeader>
           <div className="flex items-center justify-between">
             <h3 className="font-semibold text-gray-900">Detalji zastoja</h3>
-            <Badge variant={getCategoryColor(downtime.category) as any}>
+            <Badge variant={getCategoryColor(downtime.category)}>
               {getCategoryLabel(downtime.category)}
             </Badge>
           </div>

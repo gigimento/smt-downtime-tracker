@@ -1,7 +1,8 @@
 import { useState, FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AlertCircle, Activity, ScanLine } from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../context/useAuth';
+import { getApiErrorMessage } from '../services/api';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Card, CardBody } from '../components/ui/Card';
@@ -21,8 +22,8 @@ export function LoginPage() {
     try {
       await login(badgeCode, pinCode || undefined);
       navigate('/scan', { replace: true });
-    } catch (err: any) {
-      setError(err.response?.data?.detail || 'Pogrešan barkod ili PIN');
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, 'Pogrešan barkod ili PIN'));
     } finally {
       setIsLoading(false);
     }
@@ -36,7 +37,7 @@ export function LoginPage() {
             <Activity className="w-8 h-8 text-white" />
           </div>
           <h1 className="text-2xl font-bold text-gray-900">SMT Downtime Tracker</h1>
-          <p className="text-gray-500 mt-1">Prijavi se skeniranjem barkoda</p>
+          <p className="text-gray-500 mt-1">Prijavi se skeniranjem barkoda i PIN-a</p>
         </div>
 
         {error && (
@@ -66,7 +67,7 @@ export function LoginPage() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                  PIN kod (opciono za prijavu)
+                  PIN kod
                 </label>
                 <Input
                   type="password"
@@ -74,6 +75,7 @@ export function LoginPage() {
                   onChange={(e) => setPinCode(e.target.value)}
                   placeholder="Lični PIN ili timski PIN"
                   autoComplete="off"
+                  required
                 />
               </div>
               <Button type="submit" size="lg" className="w-full" loading={isLoading}>
