@@ -134,7 +134,16 @@ jobs:
 
       - name: Audit frontend dependencies
         working-directory: ./frontend
-        run: npm audit --audit-level=high
+        run: |
+          for attempt in 1 2 3; do
+            if npm audit --audit-level=high; then
+              exit 0
+            fi
+            if [ "$attempt" -eq 3 ]; then
+              exit 1
+            fi
+            sleep 15
+          done
       
       - name: Run type check
         working-directory: ./frontend
