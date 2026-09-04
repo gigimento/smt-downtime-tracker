@@ -52,11 +52,7 @@ build_frontend() {
     
     # Build production bundle
     npm run build
-    
-    # Copy to nginx web root
-    rm -rf /opt/smt-downtime-tracker/frontend/dist/*
-    cp -r dist/* /opt/smt-downtime-tracker/frontend/dist/
-    
+
     echo "Frontend build complete"
 }
 
@@ -75,8 +71,15 @@ setup_backend() {
     pip install --upgrade pip
     pip install -r requirements.txt
     
-    # Run database migrations
-    alembic upgrade head
+    # Run database migrations when Alembic is committed.
+    if [ -f alembic.ini ] && [ -d alembic ]; then
+        alembic upgrade head
+    else
+        echo "No Alembic configuration found; set AUTO_CREATE_TABLES=true only for initial schema creation."
+        if [ -f .env ] && grep -q '^AUTO_CREATE_TABLES=true' .env; then
+            python -c "import asyncio; from app.database import init_db; asyncio.run(init_db())"
+        fi
+    fi
     
     deactivate
     echo "Backend setup complete"

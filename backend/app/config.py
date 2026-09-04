@@ -1,3 +1,4 @@
+from pydantic import model_validator
 from pydantic_settings import BaseSettings
 from typing import Optional
 from pathlib import Path
@@ -35,7 +36,10 @@ class Settings(BaseSettings):
     
     # App
     APP_NAME: str = "SMT Downtime Tracker"
+    ENVIRONMENT: str = "development"
     DEBUG: bool = True
+    RUN_BACKGROUND_WORKERS: bool = True
+    AUTO_CREATE_TABLES: bool = False
     
     # Work schedule (default 08-16, Monday-Friday only)
     WORK_DAY_START_HOUR: int = 8
@@ -49,6 +53,30 @@ class Settings(BaseSettings):
     class Config:
         env_file = str(ENV_FILE)
         case_sensitive = True
+
+    @property
+    def is_production(self) -> bool:
+        return self.ENVIRONMENT.lower() in {"production", "prod"}
+
+    @model_validator(mode="after")
+    def validate_production_settings(self) -> "Settings":
+        if not self.is_production:
+            return self
+
+        if self.DEBUG:
+            raise ValueError("DEBUG must be false in production")
+        if self.JWT_SECRET in {
+            "change-me-in-production-min-32-chars",
+            "change-me-in-production-min-32-chars!!",
+            "replace-with-at-least-32-random-characters",
+        }:
+            raise ValueError("JWT_SECRET must be changed in production")
+        if len(self.JWT_SECRET) < 32:
+            raise ValueError("JWT_SECRET must be at least 32 characters in production")
+        if self.DATABASE_URL.startswith("sqlite"):
+            raise ValueError("SQLite DATABASE_URL is not allowed in production")
+
+        return self
 
 
 settings = Settings()

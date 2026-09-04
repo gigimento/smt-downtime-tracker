@@ -51,11 +51,13 @@ source venv/bin/activate
 pip install -r requirements.txt
 
 # Configure environment
-cp .env.example .env
+cp ../.env.example .env
 # Edit .env with production values
 
-# Run migrations
-alembic upgrade head
+# Initialize schema
+# This repository currently has no committed Alembic migration directory.
+# For first deploy, set AUTO_CREATE_TABLES=true; switch it off after adopting migrations.
+AUTO_CREATE_TABLES=true python -c "import asyncio; from app.database import init_db; asyncio.run(init_db())"
 
 # Seed initial data
 python seed.py
@@ -67,10 +69,7 @@ cd frontend
 npm ci
 npm run build
 
-# Copy to nginx web root
-mkdir -p /var/www/smt-tracker
-cp -r dist/* /var/www/smt-tracker/
-chown -R www-data:www-data /var/www/smt-tracker
+# deploy/nginx.conf serves /opt/smt-downtime-tracker/frontend/dist
 ```
 
 ### 5. Systemd Service
