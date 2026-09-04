@@ -124,7 +124,10 @@ TOPIC_QUALITY=8
 ### Optional
 ```env
 DEBUG=false
+REQUIRE_PIN_FOR_LOGIN=true
 CORS_ORIGINS=["https://your-domain.com"]
+ENABLE_MES_ENDPOINT=false
+MES_API_KEY=
 WORK_DAY_START_HOUR=8
 WORK_DAY_END_HOUR=16
 WORK_DAYS=[0,1,2,3,4]
@@ -245,6 +248,15 @@ curl "https://api.telegram.org/bot<TOKEN>/getMe"
 curl "https://api.telegram.org/bot<TOKEN>/getUpdates"
 ```
 
+**MES integration returns 404 or 401:**
+```bash
+# 404 means the MES endpoint is intentionally disabled.
+grep ENABLE_MES_ENDPOINT /opt/smt-downtime-tracker/backend/.env
+
+# 401 means X-MES-API-Key is missing or does not match MES_API_KEY.
+grep MES_API_KEY /opt/smt-downtime-tracker/backend/.env
+```
+
 ## Rollback Procedure
 ```bash
 # Quick rollback
@@ -270,6 +282,8 @@ Grafana dashboard available in `monitoring/grafana-dashboard.json`
 ## Security Checklist
 - [ ] Strong JWT_SECRET (64+ chars)
 - [ ] PostgreSQL password secured
+- [ ] REQUIRE_PIN_FOR_LOGIN=true
+- [ ] MES endpoint disabled or protected with MES_API_KEY
 - [ ] Firewall: only 80, 443, 22 open
 - [ ] Fail2ban configured
 - [ ] Regular security updates

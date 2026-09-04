@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import APIKeyHeader
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 import uuid
@@ -10,16 +11,26 @@ from app.models.user import User, UserRole
 from app.schemas.mes import MESDowntimeEvent, MESDowntimeResponse
 from app.services.telegram import send_downtime_alert
 from app.services.shift_detector import detect_category_async
+from app.config import settings
 import json
 
 router = APIRouter(prefix="/mes", tags=["mes"])
+mes_api_key_header = APIKeyHeader(name="X-MES-API-Key", auto_error=False)
 
 
-# This endpoint is for the MES simulator - no auth required (or use API key)
+async def require_mes_api_key(api_key: str | None = Depends(mes_api_key_header)) -> None:
+    if not settings.ENABLE_MES_ENDPOINT:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="MES endpoint is disabled")
+
+    if settings.MES_API_KEY and api_key != settings.MES_API_KEY:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid MES API key")
+
+
 @router.post("/downtime", response_model=MESDowntimeResponse)
 async def create_mes_downtime(
     request: MESDowntimeEvent,
     db: AsyncSession = Depends(get_db),
+    _: None = Depends(require_mes_api_key),
 ):
     # Find machine by code
     result = await db.execute(select(Machine).where(Machine.code == request.machine_code))
@@ -100,4 +111,4 @@ async def create_mes_downtime(
 
 @router.get("/status")
 async def mes_status():
-    return {"status": "ok", "service": "mes-downtime-endpoint"}
+    return {"status": "ok", "service": "mes-downtime-endpoint", "enabled": settings.ENABLE_MES_ENDPOINT}

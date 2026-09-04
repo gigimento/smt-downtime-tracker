@@ -28,10 +28,13 @@ services:
       TOPIC_QUALITY: ${TOPIC_QUALITY:-0}
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
       CORS_ORIGINS: ${CORS_ORIGINS:-["http://localhost:3000","http://localhost"]}
+      REQUIRE_PIN_FOR_LOGIN: ${REQUIRE_PIN_FOR_LOGIN:-true}
       ENVIRONMENT: production
       DEBUG: "false"
       AUTO_CREATE_TABLES: ${AUTO_CREATE_TABLES:-true}
       RUN_BACKGROUND_WORKERS: ${RUN_BACKGROUND_WORKERS:-true}
+      ENABLE_MES_ENDPOINT: ${ENABLE_MES_ENDPOINT:-false}
+      MES_API_KEY: ${MES_API_KEY:-}
     ports:
       - "8000:8000"
     depends_on:

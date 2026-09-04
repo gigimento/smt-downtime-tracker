@@ -99,6 +99,12 @@ All configuration is via environment variables (see `.env.example`):
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for detailed architecture documentation.
 
+## Operations Handover
+
+For go-live and maintenance procedures, use [OPERATIONS_RUNBOOK.md](OPERATIONS_RUNBOOK.md).
+
+Before production use, configure real secrets, set `REQUIRE_PIN_FOR_LOGIN=true`, create operator accounts/PINs, confirm Telegram topic IDs, and verify `/health` from the production URL.
+
 ## License
 
 MIT

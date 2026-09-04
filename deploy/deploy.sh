@@ -23,20 +23,33 @@ if [[ $EUID -ne 0 ]]; then
 fi
 
 # Create backup directory
-mkdir -p $BACKUP_DIR
+mkdir -p "$BACKUP_DIR"
+
+get_database_url() {
+    cd "$BACKEND_DIR"
+    if [ -x "$VENV_DIR/bin/python" ]; then
+        "$VENV_DIR/bin/python" -c "from app.config import settings; print(settings.DATABASE_URL)"
+    else
+        python3 -c "from app.config import settings; print(settings.DATABASE_URL)"
+    fi
+}
 
 # Function to backup database
 backup_database() {
     echo "Creating database backup..."
+
     if [ -f "$PROJECT_DIR/backend/data/downtime_tracker.db" ]; then
         cp "$PROJECT_DIR/backend/data/downtime_tracker.db" "$BACKUP_DIR/downtime_tracker_$DATE.db"
         echo "SQLite backup created: $BACKUP_DIR/downtime_tracker_$DATE.db"
     fi
     
-    # For PostgreSQL (when available)
-    if command -v pg_dump &> /dev/null; then
-        pg_dump -h localhost -U smt_user downtime_tracker | gzip > "$BACKUP_DIR/postgres_$DATE.sql.gz"
+    DATABASE_URL="$(get_database_url)"
+    if command -v pg_dump &> /dev/null && [ -n "$DATABASE_URL" ] && [[ "$DATABASE_URL" == postgresql* ]]; then
+        PG_DUMP_URL="${DATABASE_URL/postgresql+asyncpg:/postgresql:}"
+        pg_dump "$PG_DUMP_URL" | gzip > "$BACKUP_DIR/postgres_$DATE.sql.gz"
         echo "PostgreSQL backup created: $BACKUP_DIR/postgres_$DATE.sql.gz"
+    else
+        echo "PostgreSQL backup skipped: pg_dump is missing or DATABASE_URL is not PostgreSQL"
     fi
 }
 
@@ -116,6 +129,8 @@ rollback() {
     if [ -n "$LATEST_BACKUP" ]; then
         cp "$LATEST_BACKUP" "$PROJECT_DIR/backend/data/downtime_tracker.db"
         echo "Restored database from $LATEST_BACKUP"
+    else
+        echo "No SQLite backup found. For PostgreSQL restore, use the documented pg_restore/psql procedure."
     fi
     
     systemctl start smt-tracker

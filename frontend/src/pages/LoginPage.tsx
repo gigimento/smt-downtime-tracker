@@ -36,7 +36,7 @@ export function LoginPage() {
             <Activity className="w-8 h-8 text-white" />
           </div>
           <h1 className="text-2xl font-bold text-gray-900">SMT Downtime Tracker</h1>
-          <p className="text-gray-500 mt-1">Prijavi se skeniranjem barkoda</p>
+          <p className="text-gray-500 mt-1">Prijavi se skeniranjem barkoda i PIN-a</p>
         </div>
 
         {error && (
@@ -66,7 +66,7 @@ export function LoginPage() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                  PIN kod (opciono za prijavu)
+                  PIN kod
                 </label>
                 <Input
                   type="password"
@@ -74,6 +74,7 @@ export function LoginPage() {
                   onChange={(e) => setPinCode(e.target.value)}
                   placeholder="Lični PIN ili timski PIN"
                   autoComplete="off"
+                  required
                 />
               </div>
               <Button type="submit" size="lg" className="w-full" loading={isLoading}>
